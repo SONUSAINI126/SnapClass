@@ -2,8 +2,8 @@ import streamlit as st
 
 # Must be the very first Streamlit call in the script.
 st.set_page_config(
-    page_title="SnapClass",
-    page_icon="📷",
+    page_title="SnapClass-Attendance in One Go",
+    page_icon="https://i.ibb.co/YTYGn5qV/logo.png",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -14,10 +14,7 @@ from src.screens.student_screen import student_screen
 from src.components.dialog_auto_enroll import auto_enroll_dialog
 
 def main():
-    st.set_page_config(
-        page_title="SnapClass-Attendance in One Go",
-        page_icon="https://i.ibb.co/YTYGn5qV/logo.png"
-    )
+   
     if 'login_type' not in st.session_state:
         st.session_state['login_type'] = None
 
