@@ -10,8 +10,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Add src to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add project root to path so 'src.xxx' imports work
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 # Lazy imports — only load when needed
 def get_home_screen():
