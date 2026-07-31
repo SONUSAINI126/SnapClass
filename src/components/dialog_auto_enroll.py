@@ -7,16 +7,32 @@ import time
 @st.dialog("Quick Enrollment!")
 def auto_enroll_dialog(subject_code):
     
-    join_code = st.query_params.get('join-code')
-    if join_code:
-        if st.session_state.login_type != 'student':
-            # Don't force switch if already logged in as teacher
-            if st.session_state.get('is_logged_in') and st.session_state.get('user_role') == 'teacher':
-                st.warning("Please log out as teacher first to enroll as a student.")
-                st.query_params.clear()
-                return
-            st.session_state.login_type = 'student'
+    # Safety check: must be logged in as student
+    if not st.session_state.get('is_logged_in'):
+        st.error("Please log in as a student first.")
+        if st.button('Go to Student Login'):
+            st.session_state['login_type'] = 'student'
+            if 'join-code' in st.query_params:
+                del st.query_params['join-code']
             st.rerun()
+        return
+
+    if st.session_state.get('user_role') != 'student':
+        st.error("Only students can enroll in subjects.")
+        if st.button('Close'):
+            if 'join-code' in st.query_params:
+                del st.query_params['join-code']
+            st.rerun()
+        return
+
+    if 'student_data' not in st.session_state:
+        st.error("Student data not found. Please log in again.")
+        st.session_state['is_logged_in'] = False
+        st.session_state['user_role'] = None
+        if 'join-code' in st.query_params:
+            del st.query_params['join-code']
+        st.rerun()
+        return
 
     student_id = st.session_state.student_data['student_id']
 
@@ -24,32 +40,36 @@ def auto_enroll_dialog(subject_code):
     if not res.data:
         st.error('Subject Code not found!')
         if st.button('Close'):
-            st.query_params.clear()
+            if 'join-code' in st.query_params:
+                del st.query_params['join-code']
             st.rerun()
         return
     
     subject = res.data[0]
 
-        # Check if already enrolled
+    # Check if already enrolled
     check = (
-            supabase.table("subject_students")
-            .select("*")
-            .eq("subject_id", subject["subject_id"])
-            .eq("student_id", student_id)
-            .execute()
-        )
+        supabase.table("subject_students")
+        .select("*")
+        .eq("subject_id", subject["subject_id"])
+        .eq("student_id", student_id)
+        .execute()
+    )
     if check.data:
         st.info('You are already enrolled')
         if st.button('Got it!'):
-            st.query_params.clear()
+            if 'join-code' in st.query_params:
+                del st.query_params['join-code']
             st.rerun()
         return
+    
     st.markdown(f"Would you like to enroll in **{subject['name']}**?")
 
     col1,col2 = st.columns(2)
     with col1:
         if st.button('No Thanks'):
-            st.query_params.clear()
+            if 'join-code' in st.query_params:
+                del st.query_params['join-code']
             st.rerun()
             return
     
@@ -57,9 +77,7 @@ def auto_enroll_dialog(subject_code):
         if st.button('Yes enroll now!',type='primary',width='stretch'):
             enroll_student_to_subject(student_id,subject['subject_id'])
             st.success('Joined Successfully')
-            st.query_params.clear()
+            if 'join-code' in st.query_params:
+                del st.query_params['join-code']
             time.sleep(2)
             st.rerun()
-
-
-    

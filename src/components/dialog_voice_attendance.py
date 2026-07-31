@@ -4,12 +4,6 @@ from datetime import datetime
 
 from src.database.config import supabase
 from src.pipelines.voice_pipeline import process_bulk_audio
-from src.components.dialog_attendance_results import attendance_result_dialog
-
-
-# Initialize session state
-if "voice_attendance_results" not in st.session_state:
-    st.session_state.voice_attendance_results = None
 
 
 @st.dialog("Voice Attendance")
@@ -111,16 +105,10 @@ def voice_attendance_dialog(selected_subject_id):
                     }
                 )
 
-            # Store results in session state
-            st.session_state.voice_attendance_results = (
-                pd.DataFrame(results),
-                attendance_to_log,
-            )
-
-            # Open attendance result dialog
-            df_results, logs = st.session_state.voice_attendance_results
-
-            attendance_result_dialog(
-                df_results,
-                logs,
-            )
+            # FIX: Store results in the same format as face attendance
+            # and let teacher_screen.py handle displaying them
+            st.session_state.attendance_df = pd.DataFrame(results)
+            st.session_state.attendance_logs = attendance_to_log
+            st.session_state.show_attendance_dialog = True
+            st.session_state.show_voice_dialog = False
+            st.rerun()

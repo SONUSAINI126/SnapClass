@@ -237,14 +237,14 @@ def student_dashboard():
             col_cancel, col_confirm = st.columns(2)
 
             with col_cancel:
-                if st.button("Cancel", use_container_width=True, type="secondary", key="delete_cancel"):
+                if st.button("Cancel", width='stretch', type="secondary", key="delete_cancel"):
                     st.session_state.show_delete_confirm = False
                     st.rerun()
 
             with col_confirm:
                 if st.button(
                     "🗑️ Permanently Delete Account",
-                    use_container_width=True,
+                    width='stretch',
                     type="primary",
                     disabled=(confirm_text.strip().upper() != "DELETE"),
                     key="delete_confirm_btn"

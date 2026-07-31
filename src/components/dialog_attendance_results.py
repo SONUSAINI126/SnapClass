@@ -52,6 +52,8 @@ def show_attendance_result(df, logs):
     display_cols = ['Name', 'Roll No', 'Status']
     if 'Source' in df.columns:
         display_cols.insert(2, 'Source')
+    if 'Confidence' in df.columns:
+        display_cols.insert(2, 'Confidence')
 
     styled_df = df[display_cols].copy()
     styled_df['Roll No'] = styled_df['Roll No'].astype(str)

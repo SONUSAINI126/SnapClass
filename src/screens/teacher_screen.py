@@ -153,7 +153,7 @@ def teacher_tab_take_attendance():
                         border: 1px solid #E2E8F0;
                     ">
                 """, unsafe_allow_html=True)
-                st.image(img, use_container_width=True, caption=f'Photo {idx+1}')
+                st.image(img,caption=f'Photo {idx+1}')
                 st.markdown("</div>", unsafe_allow_html=True)
 
     has_photos = bool(st.session_state.attendance_images)
@@ -267,7 +267,7 @@ def teacher_tab_take_attendance():
                         "is_present": is_present,
                     })
 
-                # GUARD: If all students already have attendance
+                # FIX: Guard against empty results (all students already have attendance today)
                 if not results:
                     st.info("✅ All students already have attendance recorded for today.")
                     st.session_state.attendance_images = []
@@ -321,7 +321,7 @@ def teacher_tab_manage_subjects():
                         "📊 Report",
                         key=f"report_{sub['subject_code']}_{sub['section']}_{idx}",
                         icon=":material/assessment:",
-                        use_container_width=True,
+                        width='stretch',
                         type="primary"
                     ):
                         subject_report_dialog(
@@ -338,7 +338,7 @@ def teacher_tab_manage_subjects():
                         "🔗 Share",
                         key=f"share_{sub['subject_code']}_{sub['section']}_{idx}",
                         icon=":material/share:",
-                        use_container_width=True,
+                        width='stretch',
                         type="secondary"
                     ):
                         share_subject_dialog(
@@ -351,7 +351,7 @@ def teacher_tab_manage_subjects():
                         "🗑️ Delete",
                         key=f"delete_{sub['subject_code']}_{sub['section']}_{idx}",
                         icon=":material/delete_forever:",
-                        use_container_width=True,
+                        width='stretch',
                         type="tertiary"
                     ):
                         delete_subject_dialog(
@@ -450,7 +450,7 @@ def teacher_tab_attendance_records():
             if st.button(
                 f"📅 {row['Time']} | {row['Subject']} ({row['Course']}) - Sec {row['Section']}",
                 key=f"session_btn_{idx}",
-                use_container_width=True,
+                width='stretch',
                 type="secondary"
             ):
                 session_details_dialog(
@@ -626,15 +626,19 @@ def teacher_screen_login():
     st.space()
     st.space()
 
-    # Check lockout
-    if st.session_state.login_attempts >= MAX_ATTEMPTS:
-        time_since_last = time.time() - st.session_state.last_attempt_time
+    # Check lockout using .get() with default for extra safety
+    login_attempts = st.session_state.get("login_attempts", 0)
+    if login_attempts >= MAX_ATTEMPTS:
+        time_since_last = time.time() - st.session_state.get("last_attempt_time", 0)
         if time_since_last < LOCKOUT_SECONDS:
             remaining = int(LOCKOUT_SECONDS - time_since_last)
             st.error(f"⛔ Too many failed attempts. Please wait {remaining} seconds.")
             return
         else:
-            st.session_state.login_attempts = 0
+            st.session_state.login_attempts = st.session_state.get("login_attempts", 0) + 1
+            st.session_state.last_attempt_time = time.time()
+            remaining = MAX_ATTEMPTS - st.session_state.get("login_attempts", 0)
+            st.error(f"Invalid credentials. {remaining} attempts remaining before lockout.")
 
     teacher_username = st.text_input(
         "Username",
