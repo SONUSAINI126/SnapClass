@@ -5,6 +5,11 @@ from io import BytesIO
 
 
 def show_attendance_result(df, logs):
+    # FIX: Guard against empty DataFrame or missing Status column
+    if df.empty or 'Status' not in df.columns:
+        st.warning("No attendance records to display.")
+        return
+
     total = len(df)
     present = len(df[df['Status'] == '✅ Present'])
     absent = total - present
@@ -51,7 +56,7 @@ def show_attendance_result(df, logs):
     styled_df = df[display_cols].copy()
     styled_df['Roll No'] = styled_df['Roll No'].astype(str)
 
-    st.dataframe(styled_df, hide_index=True, width='stretch')
+    st.dataframe(styled_df, hide_index=True, use_container_width=True)
 
     excel_buffer = BytesIO()
     df.to_excel(excel_buffer, index=False, engine='openpyxl')
@@ -70,7 +75,7 @@ def show_attendance_result(df, logs):
         )
 
     with col_discard:
-        if st.button("🗑️ Discard",width='stretch', type="tertiary"):
+        if st.button("🗑️ Discard", width='stretch', type="tertiary"):
             st.session_state.show_attendance_dialog = False
             st.session_state.voice_attendance_results = None
             st.session_state.attendance_images = []

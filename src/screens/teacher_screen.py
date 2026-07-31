@@ -32,12 +32,6 @@ from src.components.dialog_delete_subject import delete_subject_dialog
 from src.components.dialog_session_details import session_details_dialog
 
 
-# Rate Limiting
-if "login_attempts" not in st.session_state:
-    st.session_state.login_attempts = 0
-if "last_attempt_time" not in st.session_state:
-    st.session_state.last_attempt_time = 0
-
 MAX_ATTEMPTS = 5
 LOCKOUT_SECONDS = 300
 
@@ -159,7 +153,7 @@ def teacher_tab_take_attendance():
                         border: 1px solid #E2E8F0;
                     ">
                 """, unsafe_allow_html=True)
-                st.image(img, width='stretch', caption=f'Photo {idx+1}')
+                st.image(img, use_container_width=True, caption=f'Photo {idx+1}')
                 st.markdown("</div>", unsafe_allow_html=True)
 
     has_photos = bool(st.session_state.attendance_images)
@@ -272,11 +266,14 @@ def teacher_tab_take_attendance():
                         "timestamp": current_timestamp,
                         "is_present": is_present,
                     })
+
+                # GUARD: If all students already have attendance
                 if not results:
                     st.info("✅ All students already have attendance recorded for today.")
                     st.session_state.attendance_images = []
                     st.rerun()
                     return
+
                 st.session_state.show_attendance_dialog = True
                 st.session_state.attendance_df = pd.DataFrame(results)
                 st.session_state.attendance_logs = attendance_to_log
@@ -324,7 +321,7 @@ def teacher_tab_manage_subjects():
                         "📊 Report",
                         key=f"report_{sub['subject_code']}_{sub['section']}_{idx}",
                         icon=":material/assessment:",
-                        width='stretch',
+                        use_container_width=True,
                         type="primary"
                     ):
                         subject_report_dialog(
@@ -341,7 +338,7 @@ def teacher_tab_manage_subjects():
                         "🔗 Share",
                         key=f"share_{sub['subject_code']}_{sub['section']}_{idx}",
                         icon=":material/share:",
-                        width='stretch',
+                        use_container_width=True,
                         type="secondary"
                     ):
                         share_subject_dialog(
@@ -354,7 +351,7 @@ def teacher_tab_manage_subjects():
                         "🗑️ Delete",
                         key=f"delete_{sub['subject_code']}_{sub['section']}_{idx}",
                         icon=":material/delete_forever:",
-                        width='stretch',
+                        use_container_width=True,
                         type="tertiary"
                     ):
                         delete_subject_dialog(
@@ -453,7 +450,7 @@ def teacher_tab_attendance_records():
             if st.button(
                 f"📅 {row['Time']} | {row['Subject']} ({row['Course']}) - Sec {row['Section']}",
                 key=f"session_btn_{idx}",
-                width='stretch',
+                use_container_width=True,
                 type="secondary"
             ):
                 session_details_dialog(
@@ -604,6 +601,12 @@ def login_teacher(username, password):
 
 
 def teacher_screen_login():
+    # FIX: Initialize session state inside function (safe for Streamlit reruns)
+    if "login_attempts" not in st.session_state:
+        st.session_state.login_attempts = 0
+    if "last_attempt_time" not in st.session_state:
+        st.session_state.last_attempt_time = 0
+
     c1, c2 = st.columns(2, vertical_alignment="center")
 
     with c1:
