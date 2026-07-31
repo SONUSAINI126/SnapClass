@@ -182,7 +182,7 @@ def subject_report_dialog(subject_id, subject_name, subject_code, course, sectio
     st.dataframe(
         display_df,
         hide_index=True,
-        use_container_width=True,
+        width='stretch',
         column_config={
             "Attendance %": st.column_config.ProgressColumn(
                 "Attendance %",
@@ -245,7 +245,7 @@ def subject_report_dialog(subject_id, subject_name, subject_code, course, sectio
             data=excel_buffer,
             file_name=f"Attendance_Report_{subject_code}_{datetime.now().strftime('%Y%m%d')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width='stretch',
             type="primary",
             icon=":material/download:"
         )

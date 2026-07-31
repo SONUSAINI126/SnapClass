@@ -37,13 +37,13 @@ def delete_subject_dialog(subject_id, subject_name, subject_code, course, sectio
     col_cancel, col_delete = st.columns(2)
 
     with col_cancel:
-        if st.button("Cancel", use_container_width=True, type="secondary"):
+        if st.button("Cancel", width='stretch', type="secondary"):
             st.rerun()
 
     with col_delete:
         if st.button(
             "🗑️ Delete Permanently",
-            use_container_width=True,
+            width='stretch',
             type="primary",
             disabled=(confirm_text.strip().upper() != subject_code.strip().upper())
         ):

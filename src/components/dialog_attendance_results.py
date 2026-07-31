@@ -51,7 +51,7 @@ def show_attendance_result(df, logs):
     styled_df = df[display_cols].copy()
     styled_df['Roll No'] = styled_df['Roll No'].astype(str)
 
-    st.dataframe(styled_df, hide_index=True, use_container_width=True)
+    st.dataframe(styled_df, hide_index=True, width='stretch')
 
     excel_buffer = BytesIO()
     df.to_excel(excel_buffer, index=False, engine='openpyxl')
@@ -65,12 +65,12 @@ def show_attendance_result(df, logs):
             data=excel_buffer,
             file_name=f"attendance_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width='stretch',
             type="secondary"
         )
 
     with col_discard:
-        if st.button("🗑️ Discard", use_container_width=True, type="tertiary"):
+        if st.button("🗑️ Discard",width='stretch', type="tertiary"):
             st.session_state.show_attendance_dialog = False
             st.session_state.voice_attendance_results = None
             st.session_state.attendance_images = []
@@ -80,7 +80,7 @@ def show_attendance_result(df, logs):
             st.rerun()
 
     with col_confirm:
-        if st.button('✅ Confirm and Save', use_container_width=True, type='primary'):
+        if st.button('✅ Confirm and Save', width='stretch', type='primary'):
             try:
                 create_attendance(logs)
                 st.toast("🎉 Attendance saved successfully!", icon="✅")

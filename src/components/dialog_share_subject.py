@@ -47,7 +47,7 @@ def share_subject_dialog(subject_name, subject_code):
             qr = segno.make(join_url)
             out = io.BytesIO()
             qr.save(out, kind="png", scale=10, border=2)
-            st.image(out.getvalue(), use_container_width=True)
+            st.image(out.getvalue(), width='stretch')
             st.markdown("""
                 <p style="color: #94A3B8; font-size: 0.8rem; text-align: center; margin-top: 4px;">
                     Students can scan to join instantly

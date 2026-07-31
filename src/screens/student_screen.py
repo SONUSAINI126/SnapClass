@@ -152,7 +152,6 @@ def student_dashboard():
                             supabase.table("students").update({"face_embedding": None}).eq("student_id", student_id).execute()
                             st.session_state.student_data['face_embedding'] = None
                             st.success("Face ID cleared!")
-                            train_classifier()
                             st.session_state.confirm_clear_face = False
                             time.sleep(1.5)
                             st.rerun()
@@ -238,14 +237,14 @@ def student_dashboard():
             col_cancel, col_confirm = st.columns(2)
 
             with col_cancel:
-                if st.button("Cancel", use_container_width=True, type="secondary", key="delete_cancel"):
+                if st.button("Cancel", width='stretch', type="secondary", key="delete_cancel"):
                     st.session_state.show_delete_confirm = False
                     st.rerun()
 
             with col_confirm:
                 if st.button(
                     "🗑️ Permanently Delete Account",
-                    use_container_width=True,
+                    width='stretch',
                     type="primary",
                     disabled=(confirm_text.strip().upper() != "DELETE"),
                     key="delete_confirm_btn"
@@ -257,8 +256,6 @@ def student_dashboard():
                             supabase.table("subject_students").delete().eq("student_id", student_id).execute()
                             supabase.table("attendance_logs").delete().eq("student_id", student_id).execute()
                             supabase.table("students").delete().eq("student_id", student_id).execute()
-
-                            train_classifier()
 
                         st.success("✅ Account deleted successfully!")
                         st.session_state["is_logged_in"] = False
@@ -478,7 +475,7 @@ def student_screen():
                 st.warning("Microphone not available. You can skip voice enrollment.")
 
             # Create Account Button
-            if st.button('Create Account', type='primary', use_container_width=True):
+            if st.button('Create Account', type='primary', width='stretch'):
                 # Validate name
                 if not new_name or not new_name.strip():
                     st.error("⛔ Please enter your name")
@@ -541,7 +538,7 @@ def student_screen():
                     )
 
                     if response_data:
-                        train_classifier()
+                        
                         st.session_state.is_logged_in = True
                         st.session_state.user_role = "student"
                         st.session_state.student_data = response_data[0]

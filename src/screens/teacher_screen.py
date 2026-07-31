@@ -159,7 +159,7 @@ def teacher_tab_take_attendance():
                         border: 1px solid #E2E8F0;
                     ">
                 """, unsafe_allow_html=True)
-                st.image(img, use_container_width=True, caption=f'Photo {idx+1}')
+                st.image(img, width='stretch', caption=f'Photo {idx+1}')
                 st.markdown("</div>", unsafe_allow_html=True)
 
     has_photos = bool(st.session_state.attendance_images)
@@ -272,7 +272,11 @@ def teacher_tab_take_attendance():
                         "timestamp": current_timestamp,
                         "is_present": is_present,
                     })
-
+                if not results:
+                    st.info("✅ All students already have attendance recorded for today.")
+                    st.session_state.attendance_images = []
+                    st.rerun()
+                    return
                 st.session_state.show_attendance_dialog = True
                 st.session_state.attendance_df = pd.DataFrame(results)
                 st.session_state.attendance_logs = attendance_to_log
@@ -320,7 +324,7 @@ def teacher_tab_manage_subjects():
                         "📊 Report",
                         key=f"report_{sub['subject_code']}_{sub['section']}_{idx}",
                         icon=":material/assessment:",
-                        use_container_width=True,
+                        width='stretch',
                         type="primary"
                     ):
                         subject_report_dialog(
@@ -337,7 +341,7 @@ def teacher_tab_manage_subjects():
                         "🔗 Share",
                         key=f"share_{sub['subject_code']}_{sub['section']}_{idx}",
                         icon=":material/share:",
-                        use_container_width=True,
+                        width='stretch',
                         type="secondary"
                     ):
                         share_subject_dialog(
@@ -350,7 +354,7 @@ def teacher_tab_manage_subjects():
                         "🗑️ Delete",
                         key=f"delete_{sub['subject_code']}_{sub['section']}_{idx}",
                         icon=":material/delete_forever:",
-                        use_container_width=True,
+                        width='stretch',
                         type="tertiary"
                     ):
                         delete_subject_dialog(
@@ -449,7 +453,7 @@ def teacher_tab_attendance_records():
             if st.button(
                 f"📅 {row['Time']} | {row['Subject']} ({row['Course']}) - Sec {row['Section']}",
                 key=f"session_btn_{idx}",
-                use_container_width=True,
+                width='stretch',
                 type="secondary"
             ):
                 session_details_dialog(
@@ -571,7 +575,7 @@ def teacher_tab_attendance_records():
                 data=excel_buffer,
                 file_name=f"attendance_complete_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
+                width='stretch',
                 type="primary",
                 icon=":material/download:"
             )

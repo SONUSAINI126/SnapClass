@@ -45,7 +45,7 @@ def create_subject_dialog(teacher_id):
 
     final_course = custom_course.strip().upper() if sub_course == "Other" and custom_course else sub_course
 
-    if st.button("Create Subject", type="primary", use_container_width=True):
+    if st.button("Create Subject", type="primary", width='stretch'):
         sub_id_clean = sub_id.strip().upper() if sub_id else ""
 
         if not all([sub_id_clean, sub_name, final_course, sub_section]):

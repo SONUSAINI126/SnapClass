@@ -25,7 +25,7 @@ def voice_attendance_dialog(selected_subject_id):
     if st.button(
         "Analyze Audio",
         type="primary",
-        use_container_width=True
+        width='stretch'
     ):
 
         if audio_data is None:

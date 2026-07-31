@@ -158,3 +158,23 @@ def predict_attendance(image_np):
             all_ids.append(predicted_id)
     
     return detected, all_ids, num_faces
+
+def get_trained_model():
+    """Return known face embeddings for duplicate detection during registration."""
+    all_students = get_all_students()
+    if not all_students:
+        return None
+    
+    known_embeddings = []
+    known_ids = []
+    
+    for student in all_students:
+        emb = student.get('face_embedding')
+        if emb:
+            known_embeddings.append(np.array(emb))
+            known_ids.append(student['student_id'])
+    
+    if len(known_ids) == 0:
+        return None
+        
+    return {'X': known_embeddings, 'y': known_ids}

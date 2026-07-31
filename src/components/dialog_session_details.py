@@ -80,16 +80,16 @@ def session_details_dialog(teacher_id, subject_id, subject_name, subject_code, c
     ])
 
     with tab_all:
-        st.dataframe(df, hide_index=True, use_container_width=True)
+        st.dataframe(df, hide_index=True, width='stretch')
 
     with tab_present:
         if present_list:
-            st.dataframe(pd.DataFrame(present_list), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(present_list), hide_index=True, width='stretch')
         else:
             st.info("No students were present.")
 
     with tab_absent:
         if absent_list:
-            st.dataframe(pd.DataFrame(absent_list), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(absent_list), hide_index=True, width='stretch')
         else:
             st.info("No students were absent. Perfect attendance! 🎉")
