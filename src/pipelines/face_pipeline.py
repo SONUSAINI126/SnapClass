@@ -12,7 +12,12 @@ RESEMBLANCE_THRESHOLD = 0.6
 def load_face_models():
     """Load dlib face detection and recognition models."""
     # Models face_recognition_models se aayenge
-    import face_recognition_models
+    try:
+        import face_recognition_models
+        MODELS_AVAILABLE = True
+    except ImportError:
+        MODELS_AVAILABLE = False
+        st.error("Face recognition models not available")
     
     face_rec_model_path = face_recognition_models.face_recognition_model_location()
     predictor_path = face_recognition_models.pose_predictor_model_location()
