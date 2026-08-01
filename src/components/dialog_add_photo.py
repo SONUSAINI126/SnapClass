@@ -1,14 +1,25 @@
 import streamlit as st
 from PIL import Image
+import hashlib
 
 MAX_FILE_SIZE_MB = 10
 MAX_IMAGE_DIMENSION = 4096
+
+
+def _hash_bytes(data):
+    """Create a hash of file bytes for duplicate detection."""
+    return hashlib.md5(data).hexdigest()
 
 
 @st.dialog("Capture or Upload Photos")
 def add_photos_dialog():
     if "attendance_images" not in st.session_state:
         st.session_state.attendance_images = []
+    if "_last_cam_hash" not in st.session_state:
+        st.session_state._last_cam_hash = None
+    if "_last_upload_hashes" not in st.session_state:
+        st.session_state._last_upload_hashes = None
+
     st.write("Add classroom photos to scan for attendance.")
 
     if "photo_tab" not in st.session_state:
@@ -32,13 +43,15 @@ def add_photos_dialog():
     if st.session_state.photo_tab == "camera":
         cam_photo = st.camera_input("Take Snapshot", key="dialog_cam")
 
-        # FIX: Only add photo when explicit button is clicked
-        # This prevents infinite loop from camera_input persisting across reruns
         if cam_photo:
-            st.image(cam_photo, caption="Preview")
-            if st.button("📷 Add This Photo", key="add_cam_btn", type="primary", width="stretch"):
+            # Hash the photo to detect if it's already been added
+            cam_bytes = cam_photo.getvalue()
+            cam_hash = _hash_bytes(cam_bytes)
+
+            if cam_hash != st.session_state._last_cam_hash:
                 st.session_state.attendance_images.append(Image.open(cam_photo))
-                st.toast("Photo Captured Successfully!")
+                st.session_state._last_cam_hash = cam_hash
+                st.toast("📷 Photo added!")
                 st.rerun()
 
     # ---------------- UPLOAD ----------------
@@ -51,10 +64,10 @@ def add_photos_dialog():
         )
 
         if uploaded_files:
-            st.write(f"{len(uploaded_files)} file(s) selected")
-            
-            # FIX: Only process files when explicit button is clicked
-            if st.button(f"⬆️ Add {len(uploaded_files)} Photo(s)", key="add_upload_btn", type="primary", width="stretch"):
+            # Create a combined hash of all selected files
+            combined_hash = "|".join(_hash_bytes(f.getvalue()) for f in uploaded_files)
+
+            if combined_hash != st.session_state._last_upload_hashes:
                 valid_files = []
                 for f in uploaded_files:
                     file_size_mb = len(f.getvalue()) / (1024 * 1024)
@@ -80,8 +93,9 @@ def add_photos_dialog():
                 for img in valid_files:
                     st.session_state.attendance_images.append(img)
 
+                st.session_state._last_upload_hashes = combined_hash
                 if valid_files:
-                    st.toast(f"✅ {len(valid_files)} photo(s) uploaded successfully!")
+                    st.toast(f"✅ {len(valid_files)} photo(s) added!")
                 st.rerun()
 
     st.divider()
