@@ -81,17 +81,21 @@ def subject_report_dialog(subject_id, subject_name, subject_code, course, sectio
     sr_no = 1
     
     for sid, stats in sorted(student_stats.items(), key=lambda x: x[1]['roll_no']):
-        attendance_pct = round((stats['present'] / stats['total'] * 100), 2) if stats['total'] > 0 else 0
+        if stats['total'] > 0:
+            attendance_pct = round((stats['present'] / stats['total'] * 100), 2)
+        else:
+            attendance_pct = 0  # No classes conducted yet
         
         report_rows.append({
             'Sr. No.': sr_no,
             'Roll No.': stats['roll_no'],
             'Student Name': stats['name'],
             'Total Attendance': f"{stats['present']}/{stats['total']}",
-            'Attendance %': f"{attendance_pct:.2f}%",
-            '_pct': attendance_pct,  # For sorting/filtering
+            'Attendance %': attendance_pct,  # ✅ Numeric value (0-100)
+            '_pct': attendance_pct,
             '_present': stats['present'],
         })
+
         sr_no += 1
 
     df_report = pd.DataFrame(report_rows)
@@ -182,12 +186,12 @@ def subject_report_dialog(subject_id, subject_name, subject_code, course, sectio
     st.dataframe(
         display_df,
         hide_index=True,
-        width='stretch',
+        use_container_width=True,  # ✅ Correct
         column_config={
             "Attendance %": st.column_config.ProgressColumn(
                 "Attendance %",
                 help="Attendance percentage",
-                format="%s",
+                format="%.2f%%",  # ✅ Shows "85.50%"
                 min_value=0,
                 max_value=100,
             ),
@@ -245,7 +249,7 @@ def subject_report_dialog(subject_id, subject_name, subject_code, course, sectio
             data=excel_buffer,
             file_name=f"Attendance_Report_{subject_code}_{datetime.now().strftime('%Y%m%d')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            width='stretch',
+            use_container_width=True,  # ✅ Correct
             type="primary",
             icon=":material/download:"
         )
