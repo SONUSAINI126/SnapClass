@@ -1,5 +1,5 @@
 import streamlit as st
-from src.database.db import create_attendance
+from src.database.db import upsert_attendance_logs
 import pandas as pd
 from io import BytesIO
 
@@ -89,7 +89,7 @@ def show_attendance_result(df, logs):
     with col_confirm:
         if st.button('✅ Confirm and Save', width='stretch', type='primary'):
             try:
-                create_attendance(logs)
+                upsert_attendance_logs(logs)
                 st.toast("🎉 Attendance saved successfully!", icon="✅")
                 st.session_state.show_attendance_dialog = False
                 st.session_state.attendance_images = []

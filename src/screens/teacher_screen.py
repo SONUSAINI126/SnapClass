@@ -192,12 +192,12 @@ def teacher_tab_take_attendance():
             icon=':material/mic:'
         )
 
-    def check_existing_attendance(student_id, subject_id):
+    def get_existing_attendance_row(student_id, subject_id):
         today = datetime.now().strftime("%Y-%m-%d")
-        res = supabase.table('attendance_logs').select('id')\
+        res = supabase.table('attendance_logs').select('id,is_present')\
             .eq('student_id', student_id).eq('subject_id', subject_id)\
             .gte('timestamp', f"{today}T00:00:00").execute()
-        return len(res.data) > 0
+        return res.data[0] if res.data else None
 
     if run_face_clicked and has_photos:
         with st.status("🔍 Processing classroom photos...", expanded=True) as status:
@@ -239,11 +239,13 @@ def teacher_tab_take_attendance():
                 for node in enrolled_students:
                     student = node["students"]
 
-                    if check_existing_attendance(student["student_id"], selected_subject_id):
-                        continue
-
+                    existing_row = get_existing_attendance_row(student["student_id"], selected_subject_id)
                     sources = all_detected_ids.get(int(student["student_id"]), [])
                     is_present = len(sources) > 0
+
+                    if existing_row and (existing_row["is_present"] or not is_present):
+                         # Already logged present, or still not seen in any photo — nothing new
+                         continue
 
                     actual_roll_no = student.get("roll_no")
                     if actual_roll_no and str(actual_roll_no).strip() and str(actual_roll_no).strip().lower() not in ['none', 'null', 'nan', '']:
@@ -420,16 +422,19 @@ def teacher_tab_attendance_records():
     df_sessions = pd.DataFrame(session_data)
 
     session_summary = (
-        df_sessions.groupby([
-            "ts_group", "timestamp_raw", "Time", "Subject", 
-            "Subject Code", "Course", "Section", "subject_id"
-        ])
-        .agg(
-            Present_Count=("is_present", "sum"),
-            Total_Count=("is_present", "count"),
+            df_sessions.groupby([
+                "ts_group", "Subject", "Subject Code", "Course", "Section", "subject_id"
+            ])
+            .agg(
+                Present_Count=("is_present", "sum"),
+                Total_Count=("is_present", "count"),
+                timestamp_raw=("timestamp_raw", "max"),  # latest update time that day
+            )
+            .reset_index()
         )
-        .reset_index()
-    )
+    session_summary["Time"] = session_summary["timestamp_raw"].apply(
+            lambda ts: datetime.fromisoformat(ts).strftime("%Y-%m-%d %I:%M %p") if ts else "N/A"
+        )
 
     session_summary["Attendance Rate"] = (
         (session_summary["Present_Count"] / session_summary["Total_Count"] * 100)
@@ -460,7 +465,7 @@ def teacher_tab_attendance_records():
                     row["Subject Code"],
                     row["Course"],
                     row["Section"],
-                    row["timestamp_raw"],
+                    str(row["ts_group"]),
                     int(row["Present_Count"]),
                     int(row["Total_Count"])
                 )

@@ -86,7 +86,7 @@ def get_face_embeddings(image_np):
 
 
 def predict_attendance(image_np):
-    """Predict which students are in the photo."""
+    """Predict which students are in the photo using nearest-neighbor distance matching."""
     embeddings = get_face_embeddings(image_np)
 
     num_faces = len(embeddings)
@@ -97,7 +97,6 @@ def predict_attendance(image_np):
     if not all_students:
         return {}, [], num_faces
 
-    # Build known embeddings
     known_embeddings = []
     known_ids = []
 
@@ -111,54 +110,30 @@ def predict_attendance(image_np):
         st.warning("No students have registered their face yet.")
         return {}, [], num_faces
 
-    if len(known_ids) == 1:
-        detected = {}
-        all_ids = []
-
-        for face_data in embeddings:
-            encoding = face_data['embedding']
-            dist = np.linalg.norm(known_embeddings[0] - encoding)
-
-            if dist < RESEMBLANCE_THRESHOLD:
-                student_id = known_ids[0]
-                detected[student_id] = {
-                    'confidence': float(1.0 - dist),
-                    'distance': float(dist)
-                }
-                all_ids.append(student_id)
-
-        return detected, all_ids, num_faces
-
-    # 2+ students — use SVM
-    from sklearn.svm import SVC
-    clf = SVC(probability=True)
-    clf.fit(known_embeddings, known_ids)
+    known_matrix = np.array(known_embeddings)
 
     detected = {}
-    all_ids = []
 
     for face_data in embeddings:
         encoding = face_data['embedding']
-        predicted_id = int(clf.predict([encoding])[0])
+        # Nearest-neighbor match instead of an SVM: with ~1 sample per
+        # student, an SVM's probability calibration is unreliable and was
+        # rejecting genuine matches. Distance comparison is deterministic
+        # and matches how dlib embeddings are designed to be compared.
+        distances = np.linalg.norm(known_matrix - encoding, axis=1)
+        best_idx = int(np.argmin(distances))
+        best_distance = distances[best_idx]
 
-        probs = clf.predict_proba([encoding])[0]
-        max_prob = np.max(probs)
+        if best_distance < RESEMBLANCE_THRESHOLD:
+            student_id = known_ids[best_idx]
+            if student_id not in detected or best_distance < detected[student_id]['distance']:
+                detected[student_id] = {
+                    'confidence': float(1.0 - best_distance),
+                    'distance': float(best_distance)
+                }
 
-        if max_prob < 0.60:
-            continue
-
-        student_idx = known_ids.index(predicted_id)
-        dist = np.linalg.norm(known_embeddings[student_idx] - encoding)
-
-        if dist < RESEMBLANCE_THRESHOLD:
-            detected[predicted_id] = {
-                'confidence': float(max_prob),
-                'distance': float(dist)
-            }
-            all_ids.append(predicted_id)
-
+    all_ids = list(detected.keys())
     return detected, all_ids, num_faces
-
 
 def get_trained_model():
     """Return known face embeddings for duplicate detection during registration."""

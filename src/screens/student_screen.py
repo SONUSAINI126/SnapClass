@@ -255,8 +255,10 @@ def student_dashboard():
 
                             supabase.table("subject_students").delete().eq("student_id", student_id).execute()
                             supabase.table("attendance_logs").delete().eq("student_id", student_id).execute()
-                            supabase.table("students").delete().eq("student_id", student_id).execute()
-
+                            supabase.table("students").update({
+                                "face_embedding": None,
+                                "voice_embedding": None,
+                            }).eq("student_id", student_id).execute()
                         st.success("✅ Account deleted successfully!")
                         st.session_state["is_logged_in"] = False
                         st.session_state["user_role"] = None

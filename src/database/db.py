@@ -259,17 +259,52 @@ def get_attendance_for_teacher(teacher_id):
     return response.data
 
 
-def get_attendance_session_details(teacher_id, subject_id, timestamp):
-    """Get full student-wise attendance for a specific session."""
+def get_attendance_session_details(teacher_id, subject_id, session_date):
+    """Get full student-wise attendance for a specific day's session."""
     ownership = supabase.table('subjects').select('teacher_id').eq('subject_id', subject_id).execute()
     if not ownership.data or ownership.data[0]['teacher_id'] != teacher_id:
         return []
 
     response = supabase.table('attendance_logs').select(
         "*,students(student_id,name,roll_no),subjects(*)"
-    ).eq('subjects.teacher_id', teacher_id).eq('subject_id', subject_id).eq('timestamp', timestamp).execute()
+    ).eq('subject_id', subject_id) \
+     .gte('timestamp', f"{session_date}T00:00:00") \
+     .lt('timestamp', f"{session_date}T23:59:59.999999") \
+     .execute()
     return response.data if response.data else []
 
+
+def upsert_attendance_logs(logs):
+    """Insert new attendance rows, or flip an existing absent row to present.
+    Keeps exactly one row per (student, subject, day) even across multiple
+    'Run Face Analysis' submissions on the same day."""
+    if not logs:
+        return []
+
+    inserted = []
+    for log in logs:
+        date_key = log['timestamp'][:10] if log.get('timestamp') else None
+        if not date_key:
+            continue
+
+        existing = supabase.table('attendance_logs').select('id,is_present') \
+            .eq('student_id', log['student_id']) \
+            .eq('subject_id', log['subject_id']) \
+            .gte('timestamp', f"{date_key}T00:00:00") \
+            .lt('timestamp', f"{date_key}T23:59:59.999999") \
+            .execute()
+
+        if existing.data:
+            row = existing.data[0]
+            if log.get('is_present') and not row.get('is_present'):
+                supabase.table('attendance_logs').update(
+                    {'is_present': True}
+                ).eq('id', row['id']).execute()
+        else:
+            resp = supabase.table('attendance_logs').insert(log).execute()
+            inserted.extend(resp.data or [])
+
+    return inserted
 
 def get_all_attendance_for_teacher_detailed(teacher_id):
     """Get all attendance with student details for Excel export."""
