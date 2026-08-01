@@ -88,7 +88,7 @@ def main():
     except Exception as e:
         st.error("🚨 App Error Detected")
         st.code(traceback.format_exc())
-        st.info("Please screenshot this error and share it for debugging.")
+        st.info("Please Retry")
 
 if __name__ == '__main__':
     main()
