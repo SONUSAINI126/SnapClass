@@ -508,7 +508,6 @@ def student_screen():
                 from src.pipelines.face_pipeline import get_trained_model
 
                 with st.spinner("Creating your account..."):
-                    img = np.array(Image.open(photo_source))
                     encodings = get_face_embeddings(img)
 
                     if not encodings:
