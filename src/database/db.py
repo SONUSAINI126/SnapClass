@@ -182,7 +182,7 @@ def get_teacher_subjects(teacher_id):
         # total_students was always stuck at 0. Query the count directly —
         # this is reliable regardless of PostgREST version/config.
         count_res = supabase.table('subject_students') \
-            .select('id', count='exact') \
+            .select('*', count='exact', head=True) \
             .eq('subject_id', sub['subject_id']) \
             .execute()
         sub['total_students'] = count_res.count or 0
