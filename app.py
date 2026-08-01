@@ -51,39 +51,48 @@ def get_auto_enroll_dialog():
 
 def main():
     try:
-        login_type = st.session_state.get('login_type')
+        # ── Check join-code BEFORE rendering anything ──────────────
+        join_code = st.query_params.get('join-code')
 
+        if join_code:
+            is_teacher = (
+                st.session_state.get('is_logged_in') 
+                and st.session_state.get('user_role') == 'teacher'
+            )
+            is_student_logged_in = (
+                st.session_state.get('is_logged_in')
+                and st.session_state.get('user_role') == 'student'
+                and 'student_data' in st.session_state
+            )
+
+            # 1. Teacher logged in → warn, clear code, show teacher page
+            if is_teacher:
+                st.warning("Please log out as teacher first to enroll as a student.")
+                if 'join-code' in st.query_params:
+                    del st.query_params['join-code']
+
+            # 2. Student logged in → show dialog immediately
+            elif is_student_logged_in:
+                # Clear code NOW so it doesn't re-trigger if user hits the X button
+                if 'join-code' in st.query_params:
+                    del st.query_params['join-code']
+                get_auto_enroll_dialog()(join_code)
+                # Fall through to render the student dashboard behind the dialog
+
+            # 3. Not logged in → send to student login, KEEP the code in URL
+            elif st.session_state.get('login_type') != 'student':
+                st.session_state['login_type'] = 'student'
+                st.rerun()
+                return
+
+        # ── Render the correct screen ──────────────────────────────
+        login_type = st.session_state.get('login_type')
         if login_type == "teacher":
             get_teacher_screen()()
         elif login_type == "student":
             get_student_screen()()
         else:
             get_home_screen()()
-
-        # Handle join-code from shared links
-        join_code = st.query_params.get('join-code')
-        if join_code:
-            # If not logged in as student, switch to student portal
-            if st.session_state.get('login_type') != 'student':
-                # Don't force switch if already logged in as teacher
-                if st.session_state.get('is_logged_in') and st.session_state.get('user_role') == 'teacher':
-                    st.warning("Please log out as teacher first to enroll as a student.")
-                    if 'join-code' in st.query_params:
-                        del st.query_params['join-code']
-                    return
-                st.session_state['login_type'] = 'student'
-                st.rerun()
-                return
-
-            # Only show enroll dialog if actually logged in as student
-            if (st.session_state.get('is_logged_in') 
-                and st.session_state.get('user_role') == 'student'
-                and 'student_data' in st.session_state):
-                get_auto_enroll_dialog()(join_code)
-            else:
-                # Not logged in as student yet, clear param to prevent loop
-                if 'join-code' in st.query_params:
-                    del st.query_params['join-code']
 
     except Exception as e:
         st.error("🚨 App Error Detected")
