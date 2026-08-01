@@ -337,6 +337,21 @@ def student_dashboard():
 
     footer_dashboard()
 
+def _normalize_embedding(emb):
+    """Handle dict/list/numpy array embeddings uniformly."""
+    # If dict, extract the vector
+    if isinstance(emb, dict):
+        emb = (emb.get('embedding') 
+               or emb.get('encoding') 
+               or emb.get('face_encoding') 
+               or emb.get('vector') 
+               or list(emb.values())[0])
+    
+    # Convert to numpy array for math operations
+    if hasattr(emb, 'tolist'):
+        return np.array(emb)
+    return np.array(emb)
+
 
 def student_screen():
     style_base_layout()
@@ -370,7 +385,6 @@ def student_screen():
         text_alignment="center",
     )
 
-    # Camera with fallback
     st.info("📷 Please allow camera access when prompted")
 
     photo_source = None
@@ -382,7 +396,6 @@ def student_screen():
     except Exception as e:
         st.warning("⚠️ Camera access failed. Please use upload option below.")
 
-    # Always show upload fallback
     if not photo_source:
         photo_source = st.file_uploader(
             "Or upload a photo",
@@ -429,14 +442,12 @@ def student_screen():
         with st.container():
             st.header("New Student Registration")
 
-            # Name input
             new_name = st.text_input(
                 "Enter your Full Name *",
                 placeholder="Eg. Sonu Saini",
                 key="reg_name"
             )
 
-            # Roll Number input - REQUIRED
             st.markdown("""
                 <div style="
                     background: #FEF3C7;
@@ -461,7 +472,6 @@ def student_screen():
                 help="Your actual college/university roll number"
             )
 
-            # Optional Voice Enrollment
             st.subheader("Optional: Voice Enrollment")
             st.info("Enroll your voice for voice-only attendance")
 
@@ -474,14 +484,12 @@ def student_screen():
             except Exception as e:
                 st.warning("Microphone not available. You can skip voice enrollment.")
 
-            # Create Account Button
-            if st.button('Create Account', type='primary', width='stretch'):
-                # Validate name
+            # ── FIXED: Create Account Button ──────────────────────────
+            if st.button('Create Account', type='primary', use_container_width=True):
                 if not new_name or not new_name.strip():
                     st.error("⛔ Please enter your name")
                     return
 
-                # Validate roll number using sanitize_string
                 try:
                     roll_no_clean = sanitize_string(roll_no.strip().upper(), 20, VALID_ROLLNO_PATTERN)
                 except ValueError as e:
@@ -492,13 +500,11 @@ def student_screen():
                     st.error("⛔ Roll Number is required!")
                     return
 
-                # Check if roll number already exists
                 if check_student_exists_by_roll_no(roll_no_clean):
                     st.error(f"⛔ A student with Roll Number '{roll_no_clean}' already exists!")
                     st.info("💡 Tip: Go back and click 'Student Portal' to login with your face.")
                     return
 
-                # Check for duplicate face
                 from src.pipelines.face_pipeline import get_trained_model
 
                 with st.spinner("Creating your account..."):
@@ -509,21 +515,25 @@ def student_screen():
                         st.error("Face encoding failed. Please try again with better lighting.")
                         return
 
+                    # ── FIX: Normalize embedding regardless of format ───
+                    new_emb = _normalize_embedding(encodings[0])
+
                     # Check for duplicate face
                     model_data = get_trained_model()
                     if model_data:
                         X_train = model_data['X']
                         y_train = model_data['y']
-                        new_emb = encodings[0]
 
-                        for emb, sid in zip(X_train, y_train):
-                            distance = np.linalg.norm(emb - new_emb)
+                        for emb_raw, sid in zip(X_train, y_train):
+                            emb_existing = _normalize_embedding(emb_raw)
+                            distance = np.linalg.norm(emb_existing - new_emb)
                             if distance < 0.5:
                                 st.error(f"⛔ This face is already registered to student ID {sid}. Please login instead.")
                                 st.info("💡 If you forgot your roll number, contact your teacher.")
                                 return
 
-                    face_emb = encodings[0].tolist()
+                    # Convert to list for database storage
+                    face_emb = new_emb.tolist()
                     voice_embedding = None
 
                     if audio_data:
