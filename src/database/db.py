@@ -173,16 +173,24 @@ def create_subject(subject_code, name, course, section, teacher_id):
 
 
 def get_teacher_subjects(teacher_id):
-    response = supabase.table('subjects').select("*,subject_students(count),attendance_logs(timestamp)").eq("teacher_id", teacher_id).execute()
+    response = supabase.table('subjects').select("*,attendance_logs(timestamp)").eq("teacher_id", teacher_id).execute()
     subjects = response.data
 
     for sub in subjects:
-        sub['total_students'] = sub.get("subject_students", [{}])[0].get('count', 0) if sub.get('subject_students') else 0
+        # FIX: subject_students(count) embedded-aggregate syntax silently
+        # returned actual rows instead of a count on this project, so
+        # total_students was always stuck at 0. Query the count directly —
+        # this is reliable regardless of PostgREST version/config.
+        count_res = supabase.table('subject_students') \
+            .select('id', count='exact') \
+            .eq('subject_id', sub['subject_id']) \
+            .execute()
+        sub['total_students'] = count_res.count or 0
+
         attendance = sub.get('attendance_logs', [])
         unique_sessions = len(set(log['timestamp'] for log in attendance))
         sub['total_classes'] = unique_sessions
 
-        sub.pop('subject_students', None)
         sub.pop('attendance_logs', None)
 
     return subjects
