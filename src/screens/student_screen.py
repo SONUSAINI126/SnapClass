@@ -339,17 +339,14 @@ def student_dashboard():
 
 def _normalize_embedding(emb):
     """Handle dict/list/numpy array embeddings uniformly."""
-    # If dict, extract the vector
     if isinstance(emb, dict):
-        emb = (emb.get('embedding') 
-               or emb.get('encoding') 
-               or emb.get('face_encoding') 
-               or emb.get('vector') 
-               or list(emb.values())[0])
-    
-    # Convert to numpy array for math operations
-    if hasattr(emb, 'tolist'):
-        return np.array(emb)
+        for key in ('embedding', 'encoding', 'face_encoding', 'vector'):
+            if emb.get(key) is not None:
+                emb = emb[key]
+                break
+        else:
+            emb = list(emb.values())[0]
+
     return np.array(emb)
 
 
