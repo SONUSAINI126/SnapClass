@@ -192,13 +192,6 @@ def teacher_tab_take_attendance():
             icon=':material/mic:'
         )
 
-    def get_existing_attendance_row(student_id, subject_id):
-        today = datetime.now().strftime("%Y-%m-%d")
-        res = supabase.table('attendance_logs').select('id,is_present')\
-            .eq('student_id', student_id).eq('subject_id', subject_id)\
-            .gte('timestamp', f"{today}T00:00:00").execute()
-        return res.data[0] if res.data else None
-
     if run_face_clicked and has_photos:
         with st.status("🔍 Processing classroom photos...", expanded=True) as status:
             progress_bar = st.progress(0)
@@ -236,16 +229,29 @@ def teacher_tab_take_attendance():
                 attendance_to_log = []
                 current_timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
+                # ── BATCH fetch existing attendance for today ──
+                today = datetime.now().strftime("%Y-%m-%d")
+                student_ids = [node["students"]["student_id"] for node in enrolled_students]
+
+                existing_res = supabase.table('attendance_logs')\
+                    .select('id,student_id,is_present')\
+                    .eq('subject_id', selected_subject_id)\
+                    .in_('student_id', student_ids)\
+                    .gte('timestamp', f"{today}T00:00:00")\
+                    .execute()
+                existing_map = {r['student_id']: r for r in (existing_res.data or [])}
+
                 for node in enrolled_students:
                     student = node["students"]
+                    sid = student["student_id"]   # ← NO int() CAST
 
-                    existing_row = get_existing_attendance_row(student["student_id"], selected_subject_id)
-                    sources = all_detected_ids.get(int(student["student_id"]), [])
+                    sources = all_detected_ids.get(sid, [])
                     is_present = len(sources) > 0
 
-                    if existing_row and (existing_row["is_present"] or not is_present):
-                         # Already logged present, or still not seen in any photo — nothing new
-                         continue
+                    # Skip only if already present AND still present
+                    existing = existing_map.get(sid)
+                    if existing and existing.get("is_present") and is_present:
+                        continue
 
                     actual_roll_no = student.get("roll_no")
                     if actual_roll_no and str(actual_roll_no).strip() and str(actual_roll_no).strip().lower() not in ['none', 'null', 'nan', '']:
@@ -261,9 +267,9 @@ def teacher_tab_take_attendance():
                     })
 
                     attendance_to_log.append({
-                        "student_id": student["student_id"],
+                        "student_id": sid,
                         "student_name": student.get("name", "Unknown"),
-                        "roll_no": student.get("roll_no") or student["student_id"],
+                        "roll_no": student.get("roll_no") or sid,
                         "subject_id": selected_subject_id,
                         "timestamp": current_timestamp,
                         "is_present": is_present,
@@ -292,9 +298,8 @@ def teacher_tab_take_attendance():
             st.session_state.attendance_logs
         )
 
-    if st.session_state.get("show_voice_dialog"):
+    if st.session_state.get("show_voice_dialog") and st.session_state.get("voice_subject_id"):
         voice_attendance_dialog(st.session_state.voice_subject_id)
-
 
 def teacher_tab_manage_subjects():
     teacher_id = st.session_state.teacher_data['teacher_id']

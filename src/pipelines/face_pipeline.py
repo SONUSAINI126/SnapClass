@@ -1,156 +1,170 @@
 import dlib
 import numpy as np
-import cv2
+from sklearn.svm import SVC
 import streamlit as st
 from src.database.db import get_all_students
-import os
-
+from PIL import Image
+ 
 RESEMBLANCE_THRESHOLD = 0.6
+AMBIGUITY_MARGIN = 0.15  # min gap between top-2 SVM probabilities to trust the pick
+ 
+def _normalize_embedding(emb):
+    """Handle dict/list/numpy array embeddings uniformly."""
+    if isinstance(emb, dict):
+        for key in ('embedding', 'encoding', 'face_encoding', 'vector'):
+            if emb.get(key) is not None:
+                emb = emb[key]
+                break
+        else:
+            emb = list(emb.values())[0]
+    return np.array(emb, dtype=np.float64)
 
-# ========== LOAD DLIB MODELS ==========
+
+def _validate_image(image_np):
+    """Ensure dlib receives uint8 RGB/HW3 array."""
+    if not isinstance(image_np, np.ndarray):
+        raise TypeError("Image must be a numpy array")
+    # Grayscale → RGB
+    if image_np.ndim == 2:
+        image_np = np.stack([image_np] * 3, axis=-1)
+    # RGBA → RGB
+    if image_np.ndim == 3 and image_np.shape[2] == 4:
+        image_np = image_np[:, :, :3]
+    # Float → uint8
+    if image_np.dtype != np.uint8:
+        if image_np.max() <= 1.0:
+            image_np = (image_np * 255).astype(np.uint8)
+        else:
+            image_np = image_np.astype(np.uint8)
+    # Resize if absurdly large (saves RAM / dlib crash)
+    MAX_DIM = 2560
+    h, w = image_np.shape[:2]
+    if max(h, w) > MAX_DIM:
+        scale = MAX_DIM / max(h, w)
+        new_w, new_h = int(w * scale), int(h * scale)
+        image_np = np.array(Image.fromarray(image_np).resize((new_w, new_h)))
+    return image_np
+
 @st.cache_resource
-def load_face_models():
-    """Load dlib face detection and recognition models."""
-    # Models face_recognition_models se aayenge
-    try:
-        import face_recognition_models
-        MODELS_AVAILABLE = True
-    except ImportError:
-        MODELS_AVAILABLE = False
-        st.error("Face recognition models not available")
-
-    face_rec_model_path = face_recognition_models.face_recognition_model_location()
-    predictor_path = face_recognition_models.pose_predictor_model_location()
-
+def load_dlib_models():
+    """Load dlib models once per process. Unlike get_trained_model, this IS
+    safe to cache — these models never change, only loading them is expensive."""
+    import face_recognition_models  # lazy import: a failure here only breaks
+                                     # face features when first used, not the
+                                     # whole app at startup
     detector = dlib.get_frontal_face_detector()
-    predictor = dlib.shape_predictor(predictor_path)
-    face_rec = dlib.face_recognition_model_v1(face_rec_model_path)
-
-    return detector, predictor, face_rec
-
-detector, predictor, face_rec = load_face_models()
-
-
-def check_image_quality(image_np):
-    """Check image brightness and blur - RELAXED thresholds."""
-    gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
-    brightness = np.mean(gray)
-
-    if brightness < 15:
-        return False, "Image too dark"
-
-    laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-    if laplacian_var < 30:
-        return False, "Image too blurry"
-
-    return True, "OK"
-
-
+    sp = dlib.shape_predictor(
+        face_recognition_models.pose_predictor_model_location()
+    )
+    facerec = dlib.face_recognition_model_v1(
+        face_recognition_models.face_recognition_model_location()
+    )
+    return detector, sp, facerec
+ 
+ 
 def get_face_embeddings(image_np):
-    """Get face embeddings from image using dlib directly."""
-    quality_ok, msg = check_image_quality(image_np)
-    if not quality_ok:
-        st.warning(f"⚠️ {msg} — trying anyway...")
-
-    # dlib uses BGR, convert RGB to BGR
-    img_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-
-    # Detect faces
-    faces = detector(img_bgr, 1)
-
-    if len(faces) == 0:
-        return []
-
-    embeddings = []
+    image_np = _validate_image(image_np)
+    detector, sp, facerec = load_dlib_models()
+    faces = detector(image_np, 1)
+    encodings = []
     for face in faces:
-        face_width = face.width()
-        face_height = face.height()
-
-        # Relaxed minimum size
-        if face_width < 30 or face_height < 30:
-            continue
-
-        # Get landmarks
-        shape = predictor(img_bgr, face)
-
-        # Get face encoding (128-d vector)
-        encoding = np.array(face_rec.compute_face_descriptor(img_bgr, shape))
-
-        embeddings.append({
-            'embedding': encoding,
-            'bbox': (face.top(), face.right(), face.bottom(), face.left()),
-            'size': (face_width, face_height)
-        })
-
-    return embeddings
-
-
-def predict_attendance(image_np):
-    """Predict which students are in the photo using nearest-neighbor distance matching."""
-    embeddings = get_face_embeddings(image_np)
-
-    num_faces = len(embeddings)
-    if num_faces == 0:
-        return {}, [], 0
-
-    all_students = get_all_students()
-    if not all_students:
-        return {}, [], num_faces
-
-    known_embeddings = []
-    known_ids = []
-
-    for student in all_students:
-        emb = student.get('face_embedding')
-        if emb:
-            known_embeddings.append(np.array(emb))
-            known_ids.append(student['student_id'])
-
-    if len(known_ids) == 0:
-        st.warning("No students have registered their face yet.")
-        return {}, [], num_faces
-
-    known_matrix = np.array(known_embeddings)
-
-    detected = {}
-
-    for face_data in embeddings:
-        encoding = face_data['embedding']
-        # Nearest-neighbor match instead of an SVM: with ~1 sample per
-        # student, an SVM's probability calibration is unreliable and was
-        # rejecting genuine matches. Distance comparison is deterministic
-        # and matches how dlib embeddings are designed to be compared.
-        distances = np.linalg.norm(known_matrix - encoding, axis=1)
-        best_idx = int(np.argmin(distances))
-        best_distance = distances[best_idx]
-
-        if best_distance < RESEMBLANCE_THRESHOLD:
-            student_id = known_ids[best_idx]
-            if student_id not in detected or best_distance < detected[student_id]['distance']:
-                detected[student_id] = {
-                    'confidence': float(1.0 - best_distance),
-                    'distance': float(best_distance)
-                }
-
-    all_ids = list(detected.keys())
-    return detected, all_ids, num_faces
-
-def get_trained_model():
-    """Return known face embeddings for duplicate detection during registration."""
-    all_students = get_all_students()
-    if not all_students:
+        shape = sp(image_np, face)
+        face_descriptor = facerec.compute_face_descriptor(image_np, shape, 1)
+        encodings.append(np.array(face_descriptor, dtype=np.float64))
+    return encodings
+ 
+ 
+def get_trained_model(student_db=None):
+    """NOT cached — student list changes. But now accepts external data."""
+    X = []
+    y = []
+    if student_db is None:
+        student_db = get_all_students()
+    if not student_db:
         return None
 
-    known_embeddings = []
-    known_ids = []
+    for student in student_db:
+        embedding = student.get('face_embedding')
+        if embedding:
+            X.append(_normalize_embedding(embedding))
+            y.append(student.get('student_id'))   # Keep original type (int/str)
 
-    for student in all_students:
-        emb = student.get('face_embedding')
-        if emb:
-            known_embeddings.append(np.array(emb))
-            known_ids.append(student['student_id'])
-
-    if len(known_ids) == 0:
+    if len(X) == 0:
         return None
 
-    return {'X': known_embeddings, 'y': known_ids}
+    clf = None
+    if len(set(y)) >= 2:
+        try:
+            clf = SVC(kernel='linear', probability=True, class_weight='balanced')
+            clf.fit(X, y)
+        except ValueError:
+            clf = None
+
+    return {'clf': clf, 'X': X, 'y': y}
+ 
+ 
+def train_classifier():
+    """Kept for backward compatibility with any existing caller. Nothing
+    needs pre-training/caching anymore — get_trained_model() always
+    rebuilds fresh and cheaply, so there's nothing to invalidate."""
+    model_data = get_trained_model()
+    return bool(model_data)
+ 
+ 
+def predict_attendance(class_image_np, student_db=None):
+    encodings = get_face_embeddings(class_image_np)
+    detected_student = {}
+
+    model_data = get_trained_model(student_db)
+    if not model_data:
+        return detected_student, [], len(encodings)
+
+    clf = model_data['clf']
+    X_train = model_data['X']
+    y_train = model_data['y']
+    all_students = sorted(set(y_train), key=lambda x: str(x))
+
+    for encoding in encodings:
+        predicted_id = None
+        best_distance = float('inf')
+
+        # ── SVM path ──
+        if clf is not None:
+            try:
+                probs = clf.predict_proba([encoding])[0]
+                order = np.argsort(probs)[::-1]
+                best_prob = probs[order[0]]
+
+                # Ambiguity check
+                margin_ok = True
+                if len(order) > 1:
+                    margin_ok = (best_prob - probs[order[1]]) >= AMBIGUITY_MARGIN
+
+                if margin_ok:
+                    predicted_id = clf.classes_[order[0]]
+            except Exception:
+                predicted_id = None
+
+        # ── Fallback / Verification ──
+        if predicted_id is None:
+            # Nearest neighbor across ALL students (fixes the single-student bug)
+            for emb_raw, sid in zip(X_train, y_train):
+                emb_existing = _normalize_embedding(emb_raw)
+                dist = np.linalg.norm(emb_existing - encoding)
+                if dist < best_distance:
+                    best_distance = dist
+                    predicted_id = sid
+
+            if best_distance <= RESEMBLANCE_THRESHOLD:
+                detected_student[predicted_id] = True
+        else:
+            # Verify SVM pick with actual embedding distance
+            matches = [(i, sid) for i, sid in enumerate(y_train) if sid == predicted_id]
+            if matches:
+                idx, _ = matches[0]
+                student_embedding = _normalize_embedding(X_train[idx])
+                best_match_score = np.linalg.norm(student_embedding - encoding)
+                if best_match_score <= RESEMBLANCE_THRESHOLD:
+                    detected_student[predicted_id] = True
+
+    return detected_student, all_students, len(encodings)

@@ -10,6 +10,7 @@ from PIL import Image
 import numpy as np
 import time
 from src.pipelines.face_pipeline import predict_attendance, get_face_embeddings
+from src.pipelines.face_pipeline import _normalize_embedding
 from src.pipelines.voice_pipeline import get_voice_embedding
 from src.database.db import (
     get_all_students, create_student, get_student_subjects, 
@@ -339,19 +340,6 @@ def student_dashboard():
 
     footer_dashboard()
 
-def _normalize_embedding(emb):
-    """Handle dict/list/numpy array embeddings uniformly."""
-    if isinstance(emb, dict):
-        for key in ('embedding', 'encoding', 'face_encoding', 'vector'):
-            if emb.get(key) is not None:
-                emb = emb[key]
-                break
-        else:
-            emb = list(emb.values())[0]
-
-    return np.array(emb)
-
-
 def student_screen():
     style_base_layout()
     style_background_dashboard()
@@ -504,7 +492,7 @@ def student_screen():
                     st.info("💡 Tip: Go back and click 'Student Portal' to login with your face.")
                     return
 
-                from src.pipelines.face_pipeline import get_trained_model
+                from src.pipelines.face_pipeline import get_trained_model, _normalize_embedding
 
                 with st.spinner("Creating your account..."):
                     encodings = get_face_embeddings(img)

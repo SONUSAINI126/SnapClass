@@ -283,34 +283,61 @@ def get_attendance_session_details(teacher_id, subject_id, session_date):
 
 
 def upsert_attendance_logs(logs):
-    """Insert new attendance rows, or flip an existing absent row to present.
-    Keeps exactly one row per (student, subject, day) even across multiple
-    'Run Face Analysis' submissions on the same day."""
+    """Batch insert/update attendance. Always syncs to latest is_present value."""
     if not logs:
         return []
 
-    inserted = []
+    from collections import defaultdict
+    date_groups = defaultdict(list)
     for log in logs:
         date_key = log['timestamp'][:10] if log.get('timestamp') else None
-        if not date_key:
-            continue
+        if date_key:
+            date_groups[date_key].append(log)
 
-        existing = supabase.table('attendance_logs').select('id,is_present') \
-            .eq('student_id', log['student_id']) \
-            .eq('subject_id', log['subject_id']) \
-            .gte('timestamp', f"{date_key}T00:00:00") \
-            .lt('timestamp', f"{date_key}T23:59:59.999999") \
+    inserted = []
+    for date_key, day_logs in date_groups.items():
+        if not day_logs:
+            continue
+        subject_id = day_logs[0]['subject_id']
+        student_ids = list(set(log['student_id'] for log in day_logs))
+
+        # Batch fetch existing rows for this subject+date
+        existing = supabase.table('attendance_logs')\
+            .select('id,student_id,is_present')\
+            .eq('subject_id', subject_id)\
+            .in_('student_id', student_ids)\
+            .gte('timestamp', f"{date_key}T00:00:00")\
+            .lt('timestamp', f"{date_key}T23:59:59.999999")\
             .execute()
 
-        if existing.data:
-            row = existing.data[0]
-            if log.get('is_present') and not row.get('is_present'):
-                supabase.table('attendance_logs').update(
-                    {'is_present': True}
-                ).eq('id', row['id']).execute()
-        else:
-            resp = supabase.table('attendance_logs').insert(log).execute()
+        existing_map = {r['student_id']: r for r in (existing.data or [])}
+
+        to_insert = []
+        to_update = []
+
+        for log in day_logs:
+            sid = log['student_id']
+            existing_row = existing_map.get(sid)
+            new_status = bool(log.get('is_present'))
+
+            if existing_row:
+                # Update if changed (allows correcting false positives)
+                if bool(existing_row.get('is_present')) != new_status:
+                    to_update.append({
+                        'id': existing_row['id'],
+                        'is_present': new_status
+                    })
+            else:
+                to_insert.append(log)
+
+        if to_insert:
+            resp = supabase.table('attendance_logs').insert(to_insert).execute()
             inserted.extend(resp.data or [])
+
+        for upd in to_update:
+            supabase.table('attendance_logs')\
+                .update({'is_present': upd['is_present']})\
+                .eq('id', upd['id']).execute()
 
     return inserted
 

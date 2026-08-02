@@ -84,6 +84,7 @@ def show_attendance_result(df, logs):
             st.session_state.attendance_df = None
             st.session_state.attendance_logs = None
             st.session_state.show_voice_dialog = False
+            st.session_state.pop('voice_subject_id', None)   # ← ADD THIS LINE
             st.rerun()
 
     with col_confirm:
