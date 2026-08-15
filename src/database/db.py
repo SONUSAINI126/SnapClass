@@ -2,9 +2,12 @@ from src.database.config import supabase
 import bcrypt
 import re
 from datetime import datetime
+from zoneinfo import ZoneInfo
+import random
+import string
 
 # ========== CONSTANTS ==========
-COURSES = ["CSE", "AIML", "BCA", "MCA", "IT", "ECE", "ME", "CE", "Other"]
+COURSES = ["Btech. CSE", "Btech. AIML", "BCA", "MCA", "IT", "ECE", "ME", "CE", "Other"]
 
 MAX_NAME_LENGTH = 100
 MAX_USERNAME_LENGTH = 50
@@ -17,6 +20,19 @@ VALID_USERNAME_PATTERN = re.compile(r'^[a-zA-Z0-9_]+$')
 VALID_ROLLNO_PATTERN = re.compile(r'^[A-Z0-9\-]+$')
 VALID_SUBJECT_CODE_PATTERN = re.compile(r'^[A-Z0-9]+$')
 
+def generate_enrollment_code(length=8):
+    """Generate a unique enrollment code for a course offering."""
+    chars = string.ascii_uppercase + string.digits
+    while True:
+        code = ''.join(random.choices(chars, k=length))
+        existing = supabase.table('subjects').select('subject_id').eq('enrollment_code', code).execute()
+        if not existing.data:
+            return code
+
+
+def get_server_timestamp():
+    """Authoritative attendance timestamp in Asia/Kolkata."""
+    return datetime.now(ZoneInfo("Asia/Kolkata")).isoformat()
 
 # ========== INPUT VALIDATION HELPERS ==========
 def sanitize_string(value, max_length=100, pattern=None):
@@ -148,7 +164,7 @@ def check_student_exists_by_name(name):
 
 # ========== SUBJECT OPERATIONS ==========
 def create_subject(subject_code, name, course, section, teacher_id):
-    """Create a new subject with validated inputs."""
+    """Create a new course offering with validated inputs."""
     code = sanitize_string(subject_code, MAX_SUBJECT_CODE_LENGTH, VALID_SUBJECT_CODE_PATTERN)
     sub_name = sanitize_string(name, MAX_NAME_LENGTH)
     sub_course = sanitize_string(course, MAX_COURSE_LENGTH)
@@ -157,21 +173,38 @@ def create_subject(subject_code, name, course, section, teacher_id):
     if not all([code, sub_name, sub_course, sub_section]):
         raise ValueError("All subject fields are required")
 
-    existing = supabase.table('subjects').select('subject_id').eq('subject_code', code).execute()
+    # A teacher can have CS301 Section A and CS301 Section B,
+    # but not two identical (code + section) combos
+    existing = supabase.table('subjects').select('subject_id')\
+        .eq('subject_code', code)\
+        .eq('teacher_id', teacher_id)\
+        .eq('section', sub_section).execute()
     if existing.data:
-        raise ValueError(f"Subject code '{code}' already exists")
+        raise ValueError(f"You already teach {code} - Section {sub_section}")
+
+    enrollment_code = generate_enrollment_code()
 
     data = {
         "subject_code": code,
         "name": sub_name,
         "course": sub_course,
         "section": sub_section,
-        "teacher_id": teacher_id
+        "teacher_id": teacher_id,
+        "enrollment_code": enrollment_code
     }
     response = supabase.table("subjects").insert(data).execute()
     return response.data
 
-
+def get_subject_by_enrollment_code(enrollment_code):
+    """Fetch a course offering by its student-facing enrollment code."""
+    if not enrollment_code:
+        return None
+    res = supabase.table('subjects')\
+        .select('*,teachers(name)')\
+        .eq('enrollment_code', enrollment_code.strip().upper())\
+        .execute()
+    return res.data[0] if res.data else None
+    
 def get_teacher_subjects(teacher_id):
     response = supabase.table('subjects').select("*,attendance_logs(timestamp)").eq("teacher_id", teacher_id).execute()
     subjects = response.data

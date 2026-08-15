@@ -61,10 +61,18 @@ def create_subject_dialog(teacher_id):
             return
 
         try:
-            create_subject(sub_id_clean, sub_name, final_course, sub_section, teacher_id)
+            result = create_subject(sub_id_clean, sub_name, final_course, sub_section, teacher_id)
             st.success(f"✅ Subject created successfully! ({final_course} - {sub_section})")
+            if result and result[0].get('enrollment_code'):
+                st.code(result[0]['enrollment_code'], language="text")
+                st.markdown("""
+                    <p style="color: #4F46E5; font-weight: 600; margin-top: 8px;">
+                        🔑 Share this Enrollment Code with students
+                    </p>
+                """, unsafe_allow_html=True)
             st.balloons()
             st.rerun()
+            
         except ValueError as e:
             if "already exists" in str(e):
                 st.error(f"⛔ {e}")

@@ -227,10 +227,13 @@ def teacher_tab_take_attendance():
             else:
                 results = []
                 attendance_to_log = []
-                current_timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+                from zoneinfo import ZoneInfo
+                current_timestamp = datetime.now(ZoneInfo("Asia/Kolkata")).isoformat()
 
                 # ── BATCH fetch existing attendance for today ──
-                today = datetime.now().strftime("%Y-%m-%d")
+
+                today = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d")
                 student_ids = [node["students"]["student_id"] for node in enrolled_students]
 
                 existing_res = supabase.table('attendance_logs')\
@@ -350,7 +353,7 @@ def teacher_tab_manage_subjects():
                     ):
                         share_subject_dialog(
                             f"{sub['name']} - {sub.get('course', 'N/A')} ({sub['section']})",
-                            sub["subject_code"]
+                            sub.get("enrollment_code") or sub["subject_code"]
                         )
 
                 with delete_col:
@@ -415,7 +418,7 @@ def teacher_tab_attendance_records():
         session_data.append({
             "ts_group": datetime.fromisoformat(ts).date() if ts else None,
             "timestamp_raw": ts,
-            "Time": datetime.fromisoformat(ts).strftime("%Y-%m-%d %I:%M %p") if ts else "N/A",
+            "Time": datetime.fromisoformat(ts).strftime("%d-%b-%Y %I:%M %p") if ts else "N/A",
             "Subject": subject.get("name", "Unknown"),
             "Subject Code": subject.get("subject_code", "N/A"),
             "Course": subject.get("course", "N/A"),

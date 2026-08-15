@@ -65,9 +65,8 @@ def voice_attendance_dialog(selected_subject_id):
             results = []
             attendance_to_log = []
 
-            current_timestamp = datetime.now().strftime(
-                "%Y-%m-%dT%H:%M:%S"
-            )
+            from zoneinfo import ZoneInfo
+            current_timestamp = datetime.now(ZoneInfo("Asia/Kolkata")).isoformat()
 
             # Prepare attendance data
             for node in enrolled_students:

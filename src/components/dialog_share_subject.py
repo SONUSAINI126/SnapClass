@@ -10,9 +10,10 @@ except ImportError:
 
 
 @st.dialog("Share Class Link")
-def share_subject_dialog(subject_name, subject_code):
+def share_subject_dialog(subject_name, code):
     app_domain = st.secrets.get("APP_DOMAIN", "snapclass-main-sonu.streamlit.app")
-    join_url = f"{app_domain}/?join-code={subject_code}"
+    join_url = f"{app_domain}/?join-code={code}"
+    st.code(code, language="text")
 
     st.markdown(f"""
         <div style="
@@ -34,7 +35,7 @@ def share_subject_dialog(subject_name, subject_code):
     with col1:
         st.markdown("<h4 style='color: #0F172A; font-size: 1rem; margin-bottom: 12px;'>🔗 Copy Link</h4>", unsafe_allow_html=True)
         st.code(join_url, language="text")
-        st.code(subject_code, language="text")
+        st.code(code, language="text")
         st.markdown("""
             <p style="color: #94A3B8; font-size: 0.8rem; margin-top: 8px;">
                 💡 Tip: Share via WhatsApp, Email, or LMS

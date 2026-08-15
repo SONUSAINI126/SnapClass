@@ -200,31 +200,84 @@ def subject_report_dialog(subject_id, subject_name, subject_code, course, sectio
 
     # Excel Download
     st.divider()
-    
+
     excel_buffer = BytesIO()
-    
+
     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-        # Sheet 1: Attendance Report
-        export_df = filtered_df[['Sr. No.', 'Roll No.', 'Student Name', 'Total Attendance', 'Attendance %']].copy()
-        export_df.to_excel(writer, index=False, sheet_name='Attendance Report')
+        # --- Sheet 1: Attendance Register (date columns) ---
+        # Build date-wise matrix
+        date_sessions = {}
+        for r in attendance_data:
+            ts = r.get('timestamp')
+            if ts:
+                dt = datetime.fromisoformat(ts)
+                date_key = dt.strftime('%Y-%m-%d')
+                if date_key not in date_sessions:
+                    date_sessions[date_key] = dt
         
-        # Sheet 2: Summary
+        date_columns = sorted(date_sessions.keys())
+        date_header_map = {d: datetime.strptime(d, '%Y-%m-%d').strftime('%d-%b') for d in date_columns}
+
+        # Build attendance matrix: student_id -> date -> 'P'/'A'
+        attendance_matrix = {}
+        for r in attendance_data:
+            sid = r.get('student_id')
+            ts = r.get('timestamp')
+            if ts and sid:
+                date_key = ts[:10]
+                if sid not in attendance_matrix:
+                    attendance_matrix[sid] = {}
+                attendance_matrix[sid][date_key] = 'P' if r.get('is_present') else 'A'
+
+        register_rows = []
+        sr = 1
+        for sid, stats in sorted(student_stats.items(), key=lambda x: x[1]['roll_no']):
+            row = {
+                'Sr. No.': sr,
+                'Roll No.': stats['roll_no'],
+                'Student Name': stats['name'],
+            }
+            present_count = 0
+            for d in date_columns:
+                status = attendance_matrix.get(sid, {}).get(d, 'A')
+                row[date_header_map[d]] = status
+                if status == 'P':
+                    present_count += 1
+            
+            total = len(date_columns)
+            row['Total Present'] = present_count
+            row['Total Classes'] = total
+            row['Attendance %'] = round((present_count / total * 100), 2) if total else 0
+            register_rows.append(row)
+            sr += 1
+
+        df_register = pd.DataFrame(register_rows)
+        df_register.to_excel(writer, index=False, sheet_name='Attendance Register')
+
+        # --- Sheet 2: Summary ---
+        session_lines = [
+            f"{dt.strftime('%d-%b-%Y')} — {dt.strftime('%I:%M %p')}"
+            for dt in date_sessions.values()
+        ] if date_sessions else ["No sessions recorded"]
+
         summary_data = {
             'Metric': [
                 'Subject Name', 'Subject Code', 'Course', 'Section',
                 'Total Students', 'Total Classes Conducted',
                 'Average Attendance %', 'Students with ≥75%',
-                'Students with <75%', 'Report Generated On'
+                'Students with <75%', 'Report Generated On',
+                'Attendance Sessions'
             ],
             'Value': [
                 subject_name, subject_code, course, section,
                 total_students, total_classes,
                 f"{avg_attendance:.2f}%", above_75,
-                below_75, datetime.now().strftime("%Y-%m-%d %I:%M %p")
+                below_75, datetime.now().strftime("%Y-%m-%d %I:%M %p"),
+                '; '.join(session_lines)
             ]
         }
         pd.DataFrame(summary_data).to_excel(writer, index=False, sheet_name='Summary')
-        
+
         # Auto-adjust widths
         for sheet_name in writer.sheets:
             worksheet = writer.sheets[sheet_name]
@@ -249,7 +302,7 @@ def subject_report_dialog(subject_id, subject_name, subject_code, course, sectio
             data=excel_buffer,
             file_name=f"Attendance_Report_{subject_code}_{datetime.now().strftime('%Y%m%d')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,  # ✅ Correct
+            use_container_width=True,
             type="primary",
             icon=":material/download:"
         )

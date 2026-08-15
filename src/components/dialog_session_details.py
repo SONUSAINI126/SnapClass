@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from src.database.db import get_attendance_session_details
-
+from datetime import datetime
 
 @st.dialog("📋 Session Details")
 def session_details_dialog(teacher_id, subject_id, subject_name, subject_code, course, section, timestamp, present_count, total_count):
@@ -62,7 +62,7 @@ def session_details_dialog(teacher_id, subject_id, subject_name, subject_code, c
             "Roll No": student.get("roll_no") or student.get("student_id", "N/A"),
             "Student Name": student.get("name", "Unknown"),
             "Status": "✅ Present" if is_present else "❌ Absent",
-            "Timestamp": r.get("timestamp", "N/A")[:19].replace("T", " ") if r.get("timestamp") else "N/A"
+            "Timestamp": datetime.fromisoformat(r["timestamp"]).strftime("%d-%b-%Y %I:%M:%S %p") if r.get("timestamp") else "N/A",
         }
         student_data.append(student_info)
         

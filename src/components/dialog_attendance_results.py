@@ -70,7 +70,7 @@ def show_attendance_result(df, logs):
         st.download_button(
             label="📥 Download Excel",
             data=excel_buffer,
-            file_name=f"attendance_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            file_name=f"attendance_{pd.Timestamp.now(tz='Asia/Kolkata').strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             width='stretch',
             type="secondary"
