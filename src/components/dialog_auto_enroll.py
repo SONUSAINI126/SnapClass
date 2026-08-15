@@ -11,7 +11,7 @@ def auto_enroll_dialog(join_code):
     subject = None
     code_clean = str(join_code).strip().upper()
     
-    st.caption(f"Debug: received code '{code}'")
+    st.caption(f"Debug: received code '{code_clean}'")
     # 1. Try enrollment_code first (new architecture)
     try:
         res = supabase.table('subjects').select('*').eq('enrollment_code', code_clean).execute()
