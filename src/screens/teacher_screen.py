@@ -202,7 +202,7 @@ def teacher_tab_take_attendance():
                 detected, _, _ = predict_attendance(img_np)
 
                 if detected:
-                    for sid in detected.keys():
+                    for sid in detected:
                         student_id = int(sid)
                         all_detected_ids.setdefault(student_id, []).append(f"Photo {idx+1}")
 

@@ -7,6 +7,7 @@ from src.UI.base_layout import (
     style_base_layout,
 )
 from PIL import Image
+
 import numpy as np
 import time
 from src.pipelines.face_pipeline import predict_attendance, get_face_embeddings
@@ -407,7 +408,7 @@ def student_screen():
                 st.error("Multiple faces found. Please ensure only YOUR face is visible.")
             else:
                 if detected:
-                    student_id = list(detected.keys())[0]
+                    student_id = list(detected)[0]
                     status.update(label="✅ Face recognized!", state="complete")
                     st.success(f"Welcome, {student_id}!")
                     all_students = get_all_students()
@@ -502,7 +503,7 @@ def student_screen():
                         return
 
                     # ── FIX: Normalize embedding regardless of format ───
-                    new_emb = _normalize_embedding(encodings[0])
+                    new_emb = _normalize_embedding(encodings[0][0])
 
                     # Check for duplicate face
                     model_data = get_trained_model()

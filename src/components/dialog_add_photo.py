@@ -1,5 +1,6 @@
 import streamlit as st
 from PIL import Image
+
 import hashlib
 
 MAX_FILE_SIZE_MB = 10
