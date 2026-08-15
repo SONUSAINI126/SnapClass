@@ -123,7 +123,13 @@ def get_all_students():
     response = supabase.table('students').select("*").execute()
     return response.data
 
-
+def get_student_by_roll_no(roll_no):
+    """Fetch a single student by their roll number (for face-login claim)."""
+    if not roll_no:
+        return None
+    response = supabase.table('students').select("*").eq('roll_no', roll_no).execute()
+    return response.data[0] if response.data else None
+    
 def create_student(new_name, roll_no=None, face_embedding=None, voice_embedding=None):
     """Create a new student with validated inputs."""
     name = sanitize_string(new_name, MAX_NAME_LENGTH)
@@ -204,7 +210,7 @@ def get_subject_by_enrollment_code(enrollment_code):
         .eq('enrollment_code', enrollment_code.strip().upper())\
         .execute()
     return res.data[0] if res.data else None
-    
+
 def get_teacher_subjects(teacher_id):
     response = supabase.table('subjects').select("*,attendance_logs(timestamp)").eq("teacher_id", teacher_id).execute()
     subjects = response.data

@@ -11,6 +11,8 @@ from PIL import Image
 import numpy as np
 import time
 from src.pipelines.face_pipeline import predict_attendance, get_face_embeddings
+from src.pipelines.face_pipeline import verify_login
+from src.database.db import get_student_by_roll_no
 from src.pipelines.face_pipeline import _normalize_embedding
 from src.pipelines.voice_pipeline import get_voice_embedding
 from src.database.db import (
@@ -368,63 +370,64 @@ def student_screen():
             st.session_state["login_type"] = None
             st.rerun()
 
-    st.header(
-        "Login using FaceID",
-        text_alignment="center",
-    )
+    st.header("Login using FaceID", text_alignment="center")
+
+    roll_no_input = st.text_input(
+        "Enter your Roll Number",
+        placeholder="Eg. 2401015007",
+        key="login_roll_no",
+    ).strip().upper()
 
     st.info("📷 Please allow camera access when prompted")
 
     photo_source = None
     try:
-        photo_source = st.camera_input(
-            "Capture your selfie",
-            key="student_camera",
-        )
-    except Exception as e:
+        photo_source = st.camera_input("Capture your selfie", key="student_camera")
+    except Exception:
         st.warning("⚠️ Camera access failed. Please use upload option below.")
 
     if not photo_source:
         photo_source = st.file_uploader(
-            "Or upload a photo",
-            type=["jpg", "jpeg", "png"],
+            "Or upload a photo", type=["jpg", "jpeg", "png"],
             help="Make sure your face is clearly visible and well-lit"
         )
 
     show_registration = False
 
     if photo_source:
-        img = np.array(Image.open(photo_source))
-
-        with st.status("🔍 AI is analyzing your face...", expanded=True) as status:
-            detected, all_ids, num_faces = predict_attendance(img)
-
-            if num_faces == 0:
-                status.update(label="❌ No face detected", state="error")
-                st.error("No face detected. Tips: Ensure good lighting, face the camera directly.")
-                st.button("🔄 Try Again", key="retry_no_face")
-            elif num_faces > 1:
-                status.update(label="⚠️ Multiple faces detected", state="error")
-                st.error("Multiple faces found. Please ensure only YOUR face is visible.")
+        if not roll_no_input:
+            st.error("Please enter your Roll Number before capturing your photo.")
+        else:
+            student = get_student_by_roll_no(roll_no_input)
+            if not student:
+                st.error(f"No account found for Roll Number '{roll_no_input}'.")
+                show_registration = True
             else:
-                if detected:
-                    student_id = list(detected)[0]
-                    status.update(label="✅ Face recognized!", state="complete")
-                    st.success(f"Welcome, {student_id}!")
-                    all_students = get_all_students()
-                    student = next((s for s in all_students if s.get('student_id') == student_id), None)
+                img = np.array(Image.open(photo_source))
+                with st.status("🔍 Verifying your face...", expanded=True) as status:
+                    result = verify_login(img, student["student_id"], student_db=[student])
 
-                    if student:
+                    if result["status"] == "no_face":
+                        status.update(label="❌ No face detected", state="error")
+                        st.error("No face detected. Ensure good lighting and face the camera directly.")
+                    elif result["status"] == "multiple_faces":
+                        status.update(label="⚠️ Multiple faces detected", state="error")
+                        st.error("Multiple faces found. Please ensure only YOUR face is visible.")
+                    elif result["status"] == "not_registered":
+                        status.update(label="❌ Face not registered", state="error")
+                        st.info("No face registered for this Roll Number yet.")
+                        show_registration = True
+                    elif result["status"] == "match":
+                        status.update(label="✅ Face verified!", state="complete")
                         st.session_state.is_logged_in = True
                         st.session_state.user_role = "student"
                         st.session_state.student_data = student
                         st.toast(f"Welcome back, {student.get('name')}!", icon="✅")
                         time.sleep(1)
                         st.rerun()
-                else:
-                    status.update(label="❌ Face not recognized", state="error")
-                    st.info("Face not recognized! You might be a new student.")
-                    show_registration = True
+                    else:  # no_match
+                        status.update(label="❌ Face does not match", state="error")
+                        st.error("This face doesn't match the account for that Roll Number.")
 
     if show_registration:
         with st.container():
