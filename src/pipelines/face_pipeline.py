@@ -10,7 +10,7 @@ from PIL import Image
 # different-person distance is usually > 0.6. 0.6 is the "loose" cutoff
 # used for grouping/attendance. For LOGIN (1:1 auth) we want a much
 # stricter cutoff so strangers / lookalikes never get let in.
-ATTENDANCE_THRESHOLD = 0.55   # used for classify-against-everyone (roll call)
+ATTENDANCE_THRESHOLD = 0.6   # used for classify-against-everyone (roll call)
 LOGIN_THRESHOLD = 0.45        # used for verify-against-one (login) - strict
 AMBIGUITY_MARGIN = 0.15       # min gap between top-2 SVM probabilities to trust the pick
 
