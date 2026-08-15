@@ -11,7 +11,6 @@ from PIL import Image
 import numpy as np
 import time
 from src.pipelines.face_pipeline import predict_attendance, get_face_embeddings
-from src.pipelines.face_pipeline import verify_login
 from src.database.db import get_student_by_roll_no
 from src.pipelines.face_pipeline import _normalize_embedding
 from src.pipelines.voice_pipeline import get_voice_embedding
